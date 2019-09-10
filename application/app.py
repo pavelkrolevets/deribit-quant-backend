@@ -1,10 +1,12 @@
 from flask import request, render_template, jsonify, url_for, redirect, g, send_from_directory, flash
-from .models import User, Chain, Image
+from .models import User, Chain
 from index import app, db
 from sqlalchemy.exc import IntegrityError
 from .utils.auth import generate_token, requires_auth, verify_token
 from werkzeug.utils import secure_filename
 import os
+from finance.finance import *
+import json
 
 # @app.route('/', methods=['GET'])
 # def index():
@@ -150,33 +152,55 @@ def get_user_by_chain():
     else:
         return jsonify(token_is_valid=False), 403
 
-@app.route('/api/upload_image', methods=['POST'])
-def upload_image():
+# @app.route('/api/upload_image', methods=['POST'])
+# def upload_image():
+#     incoming = request.get_json()
+#     print(incoming)
+#
+#     # check if the post request has the file part
+#     if 'file' not in request.files:
+#         print('No file part')
+#         return jsonify(file_upload=False), 403
+#     file = request.files['file']
+#     # if user does not select file, browser also
+#     # submit an empty part without filename
+#     if file.filename == '':
+#         print('No selected file')
+#         return jsonify(file_upload=False), 403
+#     if file and allowed_file(file.filename):
+#         filename = secure_filename(file.filename)
+#         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+#         user = User.query.filter_by(email=request.files['email']).first_or_404()
+#         image = Image(
+#             url=filename,
+#         )
+#         user.images.append(image)
+#         db.session.add(image)
+#         db.session.commit()
+#         return jsonify(file_upload=True)
+#
+# def allowed_file(filename):
+#     return '.' in filename and \
+#            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/api/compute_bsm', methods=['POST'])
+def compute_bsm():
     incoming = request.get_json()
-    print(incoming)
+    is_valid = verify_token(incoming["token"])
 
-    # check if the post request has the file part
-    if 'file' not in request.files:
-        print('No file part')
-        return jsonify(file_upload=False), 403
-    file = request.files['file']
-    # if user does not select file, browser also
-    # submit an empty part without filename
-    if file.filename == '':
-        print('No selected file')
-        return jsonify(file_upload=False), 403
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        user = User.query.filter_by(email=request.files['email']).first_or_404()
-        image = Image(
-            url=filename,
-        )
-        user.images.append(image)
-        db.session.add(image)
-        db.session.commit()
-        return jsonify(file_upload=True)
+    if is_valid:
+        option_values=[]
+        data = incoming['data']
+        if incoming['option_type']=='call':
+            for item in data:
+                item = json.loads(item)
+                call = call_option(S0=item['S0'], K=item['K'], T=item['T'], r=item['r'], sigma=item['sigma'])
+                option_values.append(call.value())
+        if incoming['option_type']=='put':
+            for item in data:
+                put = put_option(S0=item.S0, K=item.K, T=item.T, r=item.r, sigma=item.sigma)
+                option_values.append(put.value())
 
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+        return jsonify(option_values=option_values)
+    else:
+        return jsonify(token_is_valid=False), 403

@@ -45,7 +45,7 @@ class Chain(db.Model):
 class Image(db.Model):
     __tablename__ = 'images'
     id = db.Column(db.Integer, primary_key=True)
-    url = db.Column(db.String)
+    url = db.Column(db.String(255))
     timestamp = db.Column(db.DateTime, index=True,default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 

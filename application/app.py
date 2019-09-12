@@ -1,5 +1,5 @@
 from flask import request, render_template, jsonify, url_for, redirect, g, send_from_directory, flash
-from .models import User, Chain
+from .models import User, Chain, Task
 from index import app, db
 from sqlalchemy.exc import IntegrityError
 from .utils.auth import generate_token, requires_auth, verify_token
@@ -7,6 +7,10 @@ from werkzeug.utils import secure_filename
 import os
 from finance.finance import *
 import json
+from finance.delta_hedger import start_delta_hedge
+from celery.result import AsyncResult
+
+
 
 # @app.route('/', methods=['GET'])
 # def index():
@@ -202,5 +206,23 @@ def compute_bsm():
                 option_values.append(put.value())
 
         return jsonify(option_values=option_values)
+    else:
+        return jsonify(token_is_valid=False), 403
+
+@app.route('/api/start_delta_hedger', methods=['POST'])
+def start_delta_hedger():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        user = User.query.filter_by(email=incoming["email"]).first_or_404()
+        delta_hedge_task = start_delta_hedge.delay()
+        task = Task(
+            pid=delta_hedge_task.task_id,
+        )
+        user.tasks.append(task)
+        db.session.add(task)
+        db.session.commit()
+        return jsonify(deltahedger_started=True)
     else:
         return jsonify(token_is_valid=False), 403

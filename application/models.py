@@ -7,7 +7,6 @@ chain_association = db.Table('chain_association', db.Model.metadata,
     db.Column('user_id', db.Integer, db.ForeignKey('user.id'))
 )
 
-
 class User(db.Model):
     __tablename__ = 'user'
     id = db.Column(db.Integer(), primary_key=True)
@@ -17,12 +16,12 @@ class User(db.Model):
     username = db.Column(db.String(255), unique=True)
     chains = db.relationship("Chain", secondary=chain_association, backref=db.backref('users_backref'))
     images = db.relationship("Image", backref='user_images')
+    tasks = db.relationship("Task", backref='user_tasks ')
 
     def __init__(self, email, password):
         self.email = email
         self.active = True
         self.password = User.hashed_password(password)
-
 
     @staticmethod
     def hashed_password(password):
@@ -49,3 +48,9 @@ class Image(db.Model):
     timestamp = db.Column(db.DateTime, index=True,default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
+class Task(db.Model):
+    __tablename__ = 'task'
+    id = db.Column(db.Integer, primary_key=True)
+    pid = db.Column(db.String(255))
+    timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))

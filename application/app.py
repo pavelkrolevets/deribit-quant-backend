@@ -9,8 +9,8 @@ from finance.finance import *
 import json
 from finance.delta_hedger import start_delta_hedge
 from celery.result import AsyncResult
-
-
+from celery.contrib.abortable import AbortableAsyncResult
+from datetime import datetime
 
 # @app.route('/', methods=['GET'])
 # def index():
@@ -156,37 +156,6 @@ def get_user_by_chain():
     else:
         return jsonify(token_is_valid=False), 403
 
-# @app.route('/api/upload_image', methods=['POST'])
-# def upload_image():
-#     incoming = request.get_json()
-#     print(incoming)
-#
-#     # check if the post request has the file part
-#     if 'file' not in request.files:
-#         print('No file part')
-#         return jsonify(file_upload=False), 403
-#     file = request.files['file']
-#     # if user does not select file, browser also
-#     # submit an empty part without filename
-#     if file.filename == '':
-#         print('No selected file')
-#         return jsonify(file_upload=False), 403
-#     if file and allowed_file(file.filename):
-#         filename = secure_filename(file.filename)
-#         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-#         user = User.query.filter_by(email=request.files['email']).first_or_404()
-#         image = Image(
-#             url=filename,
-#         )
-#         user.images.append(image)
-#         db.session.add(image)
-#         db.session.commit()
-#         return jsonify(file_upload=True)
-#
-# def allowed_file(filename):
-#     return '.' in filename and \
-#            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
 @app.route('/api/compute_bsm', methods=['POST'])
 def compute_bsm():
     incoming = request.get_json()
@@ -224,5 +193,40 @@ def start_delta_hedger():
         db.session.add(task)
         db.session.commit()
         return jsonify(deltahedger_started=True)
+    else:
+        return jsonify(token_is_valid=False), 403
+
+@app.route('/api/get_tasks', methods=['POST'])
+def get_tasks():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        user = User.query.filter_by(email=incoming["email"]).first_or_404()
+        tasks = user.tasks
+        id=[]
+        pid=[]
+        timestamp=[]
+        for item in tasks:
+            id.append(item.id),
+            pid.append(item.pid),
+            timestamp.append(item.timestamp.strftime("%Y-%m-%d %H:%M:%S"))
+        result = [{"id": i, "pid": p, "timestamp": t} for i, p, t in zip(id, pid, timestamp)]
+        return json.dumps(result)
+    else:
+        return jsonify(token_is_valid=False), 403
+
+@app.route('/api/kill_task', methods=['POST'])
+def kill_task():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        user = User.query.filter_by(email=incoming["email"]).first_or_404()
+        task = user.tasks.quiery.filter_by(pid=incoming["pid"]).first_or_404()
+        hedger_task = AbortableAsyncResult(task.pid)
+        hedger_task.abort()
+
+        return jsonify(task_stopped=True)
     else:
         return jsonify(token_is_valid=False), 403

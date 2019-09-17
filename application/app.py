@@ -8,11 +8,12 @@ import os
 from finance.finance import *
 import json
 from finance.delta_hedger import start_delta_hedge
+from celery.result import AsyncResult
 from celery.contrib.abortable import AbortableAsyncResult
 from datetime import datetime
 from finance.delta_hedger import celery
 
-
+celery.conf.broker_url = 'redis://localhost:6379/0'
 
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 
@@ -217,13 +218,14 @@ def kill_task():
 
     if is_valid:
         pid = incoming["pid"]
-        res = celery.AsyncResult(pid)
+        res = AsyncResult(pid, app=celery)
         print(res.state)
 
         try:
             celery.control.revoke(pid, terminate=True, signal='SIGKILL')
         except Exception:
             return jsonify(task_stopped=False)
+
         res = celery.AsyncResult(pid)
         print(res.state)
 

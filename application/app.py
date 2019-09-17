@@ -8,18 +8,11 @@ import os
 from finance.finance import *
 import json
 from finance.delta_hedger import start_delta_hedge
-from celery.result import AsyncResult
 from celery.contrib.abortable import AbortableAsyncResult
 from datetime import datetime
+from finance.delta_hedger import celery
 
-# @app.route('/', methods=['GET'])
-# def index():
-#     return render_template('index.html')
-#
-#
-# @app.route('/<path:path>', methods=['GET'])
-# def any_root_path(path):
-#     return render_template('index.html')
+
 
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 
@@ -186,6 +179,7 @@ def start_delta_hedger():
     if is_valid:
         user = User.query.filter_by(email=incoming["email"]).first_or_404()
         delta_hedge_task = start_delta_hedge.delay()
+        print(delta_hedge_task.status)
         task = Task(
             pid=delta_hedge_task.task_id,
         )
@@ -222,10 +216,22 @@ def kill_task():
     is_valid = verify_token(incoming["token"])
 
     if is_valid:
+        pid = incoming["pid"]
+        res = celery.AsyncResult(pid)
+        print(res.state)
+
+        try:
+            celery.control.revoke(pid, terminate=True, signal='SIGKILL')
+        except Exception:
+            return jsonify(task_stopped=False)
+        res = celery.AsyncResult(pid)
+        print(res.state)
+
         user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        task = user.tasks.quiery.filter_by(pid=incoming["pid"]).first_or_404()
-        hedger_task = AbortableAsyncResult(task.pid)
-        hedger_task.abort()
+        task = Task.query.filter_by(pid=pid).first_or_404()
+        user.tasks.remove(task)
+        db.session.commit()
+
 
         return jsonify(task_stopped=True)
     else:

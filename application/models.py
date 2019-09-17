@@ -16,7 +16,7 @@ class User(db.Model):
     username = db.Column(db.String(255), unique=True)
     chains = db.relationship("Chain", secondary=chain_association, backref=db.backref('users_backref'))
     images = db.relationship("Image", backref='user_images')
-    tasks = db.relationship("Task", backref='user_tasks ')
+    tasks = db.relationship("Task", back_populates='user', cascade="all, delete-orphan")
 
     def __init__(self, email, password):
         self.email = email
@@ -54,3 +54,4 @@ class Task(db.Model):
     pid = db.Column(db.String(255))
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    user = db.relationship("User", back_populates="tasks")

@@ -1,11 +1,5 @@
 from index import db, bcrypt
-from flask import send_from_directory
 from datetime import datetime
-
-chain_association = db.Table('chain_association', db.Model.metadata,
-    db.Column('chain_id', db.Integer, db.ForeignKey('chain.id')),
-    db.Column('user_id', db.Integer, db.ForeignKey('user.id'))
-)
 
 class User(db.Model):
     __tablename__ = 'user'
@@ -14,8 +8,6 @@ class User(db.Model):
     password = db.Column(db.String(255))
     eth_account = db.Column(db.String(255))
     username = db.Column(db.String(255), unique=True)
-    chains = db.relationship("Chain", secondary=chain_association, backref=db.backref('users_backref'))
-    images = db.relationship("Image", backref='user_images')
     tasks = db.relationship("Task", back_populates='user', cascade="all, delete-orphan")
 
     def __init__(self, email, password):
@@ -34,19 +26,6 @@ class User(db.Model):
             return user
         else:
             return None
-
-class Chain(db.Model):
-    __tablename__ = 'chain'
-    id = db.Column(db.Integer, primary_key=True)
-    users = db.relationship("User", secondary=chain_association, backref=db.backref('chains_backref'))
-    chain_id = db.Column(db.String(255))
-
-class Image(db.Model):
-    __tablename__ = 'images'
-    id = db.Column(db.Integer, primary_key=True)
-    url = db.Column(db.String(255))
-    timestamp = db.Column(db.DateTime, index=True,default=datetime.utcnow)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
 class Task(db.Model):
     __tablename__ = 'task'

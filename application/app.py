@@ -1,19 +1,15 @@
-from flask import request, render_template, jsonify, url_for, redirect, g, send_from_directory, flash
-from .models import User, Chain, Task
+from flask import request, jsonify, g
+from .models import User, Task
 from index import app, db
 from sqlalchemy.exc import IntegrityError
 from .utils.auth import generate_token, requires_auth, verify_token
-from werkzeug.utils import secure_filename
-import os
-from finance.finance import *
+from finance.option_bsm import *
 import json
-from finance.delta_hedger import start_delta_hedge
+from delta_hedger.tasks import start_delta_hedge
 from celery.result import AsyncResult
-from celery.contrib.abortable import AbortableAsyncResult
-from datetime import datetime
-from finance.delta_hedger import celery
+from delta_hedger.celery_app import celery_app
 
-celery.conf.broker_url = 'redis://localhost:6379/0'
+celery_app.conf.broker_url = 'redis://localhost:6379/0'
 
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 
@@ -101,55 +97,6 @@ def search_user():
     else:
         return jsonify(token_is_valid=False), 403
 
-@app.route('/api/add_chain', methods=['POST'])
-def add_chain():
-    incoming = request.get_json()
-    is_valid = verify_token(incoming["token"])
-
-    if is_valid:
-        chain = Chain(
-            chain_id=incoming["chain_id"],
-        )
-        user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        user.chains.append(chain)
-        db.session.add(chain)
-        db.session.commit()
-        return jsonify(chain_added=True)
-    else:
-        return jsonify(token_is_valid=False), 403
-
-@app.route('/api/get_chain_by_user', methods=['POST'])
-def get_chain_by_user():
-    incoming = request.get_json()
-    is_valid = verify_token(incoming["token"])
-
-    if is_valid:
-        # query all chains for a given user email
-        result = Chain.query.filter(Chain.users_backref.any(email=incoming["email"])).all()
-        chains = []
-        for i in result:
-            chains.append(i.chain_id)
-            print(i.chain_id)
-        return jsonify(chains=chains)
-    else:
-        return jsonify(token_is_valid=False), 403
-
-@app.route('/api/get_user_by_chain', methods=['POST'])
-def get_user_by_chain():
-    incoming = request.get_json()
-    is_valid = verify_token(incoming["token"])
-
-    if is_valid:
-        # query all chains for a given user email
-        result = User.query.filter(User.chains_backref.any(chain_id=incoming["chain_id"])).all()
-        users = []
-        for i in result:
-            users.append(i.email)
-            print(i.email)
-        return jsonify(users=users)
-    else:
-        return jsonify(token_is_valid=False), 403
-
 @app.route('/api/compute_bsm', methods=['POST'])
 def compute_bsm():
     incoming = request.get_json()
@@ -218,15 +165,15 @@ def kill_task():
 
     if is_valid:
         pid = incoming["pid"]
-        res = AsyncResult(pid, app=celery)
+        res = AsyncResult(pid, app=celery_app)
         print(res.state)
 
         try:
-            celery.control.revoke(pid, terminate=True, signal='SIGKILL')
+            celery_app.control.revoke(pid, terminate=True, signal='SIGKILL')
         except Exception:
             return jsonify(task_stopped=False)
 
-        res = celery.AsyncResult(pid)
+        res = celery_app.AsyncResult(pid)
         print(res.state)
 
         user = User.query.filter_by(email=incoming["email"]).first_or_404()

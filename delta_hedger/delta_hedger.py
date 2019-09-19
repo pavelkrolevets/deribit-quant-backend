@@ -3,7 +3,7 @@
 from math import log, sqrt, exp
 import time
 
-def hedgeDelta(deribitClient, index, hist_vola):
+def hedgeDelta(deribitClient, index, hist_vola, interval_min, interval_max):
     print("Index values", index)
     print("Hist vola", hist_vola.iloc[-1])
 
@@ -27,7 +27,7 @@ def hedgeDelta(deribitClient, index, hist_vola):
 
         ## Make delta 0 if its out of range
 
-        while (globalDelta >= 0.1) or (globalDelta <= -0.1):
+        while (globalDelta >= interval_max) or (globalDelta <= interval_min):
             ## futures contract
             fut = "BTC-" + str("27SEP19")
 

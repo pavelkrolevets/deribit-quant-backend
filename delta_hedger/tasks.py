@@ -23,7 +23,7 @@ deribitSecret = 'GjdBJzYDe-xucsvp4wfaqJ8AMMpG-6Swx7eyaWiNnBo'
 
 
 @celery_app.task(name='deltahedge.processing')
-def start_delta_hedge():
+def start_delta_hedge(interval_min,interval_max, time_period):
     '''Deribit Part'''
     deribitClient = RestClient(deribitKey, deribitSecret)
     index = deribitClient.index("BTC")
@@ -37,5 +37,5 @@ def start_delta_hedge():
     ''' Run delta hedger'''
     while True:
         histVola = getVola(api_spot, 1000, '1h', 'BTC_USDT', 24 * 7, False)
-        hedgeDelta(deribitClient, index['btc'], histVola)
-        time.sleep(300)
+        hedgeDelta(deribitClient, index['btc'], histVola, interval_min, interval_max)
+        time.sleep(time_period)

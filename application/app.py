@@ -126,8 +126,7 @@ def start_delta_hedger():
 
     if is_valid:
         user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        delta_hedge_task = start_delta_hedge.delay()
-        print(delta_hedge_task.status)
+        delta_hedge_task = start_delta_hedge.delay(float(incoming["interval_min"]), float(incoming["interval_max"]), float(incoming["time_period"]))
         task = Task(
             pid=delta_hedge_task.task_id,
         )

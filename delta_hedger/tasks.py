@@ -16,14 +16,8 @@ configuration = gate_api.Configuration()
 configuration.key = '5f5430e6102ad1c31486b56ea7ab9c5c'
 configuration.secret = '3974ca809f6525f0c2bd5866e5fa44e28633a7e4983f707f698952bb10acd047'
 
-
-## Deribit API v.1
-deribitKey = 'nVHSdBLg'
-deribitSecret = 'GjdBJzYDe-xucsvp4wfaqJ8AMMpG-6Swx7eyaWiNnBo'
-
-
 @celery_app.task(name='deltahedge.processing')
-def start_delta_hedge(interval_min,interval_max, time_period):
+def start_delta_hedge(interval_min,interval_max, time_period, deribitKey, deribitSecret):
     '''Deribit Part'''
     deribitClient = RestClient(deribitKey, deribitSecret)
     index = deribitClient.index("BTC")

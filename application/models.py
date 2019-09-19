@@ -8,6 +8,8 @@ class User(db.Model):
     password = db.Column(db.String(255))
     eth_account = db.Column(db.String(255))
     username = db.Column(db.String(255), unique=True)
+    api_pubkey = db.Column(db.String(255), unique=True)
+    api_privkey = db.Column(db.String(255), unique=True)
     tasks = db.relationship("Task", back_populates='user', cascade="all, delete-orphan")
 
     def __init__(self, email, password):

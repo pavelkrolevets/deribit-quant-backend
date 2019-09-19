@@ -126,7 +126,11 @@ def start_delta_hedger():
 
     if is_valid:
         user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        delta_hedge_task = start_delta_hedge.delay(float(incoming["interval_min"]), float(incoming["interval_max"]), float(incoming["time_period"]))
+        delta_hedge_task = start_delta_hedge.delay(float(incoming["interval_min"]),
+                                                   float(incoming["interval_max"]),
+                                                   float(incoming["time_period"]),
+                                                   user.api_pubkey,
+                                                   user.api_privkey)
         task = Task(
             pid=delta_hedge_task.task_id,
         )
@@ -180,7 +184,35 @@ def kill_task():
         user.tasks.remove(task)
         db.session.commit()
 
-
         return jsonify(task_stopped=True)
+    else:
+        return jsonify(token_is_valid=False), 403
+
+
+@app.route('/api/update_api_keys', methods=['POST'])
+def update_api_keys():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        user = User.query.filter_by(email=incoming["email"]).first_or_404()
+        user.api_pubkey = incoming["api_pubkey"]
+        user.api_privkey = incoming["api_privkey"]
+        db.session.commit()
+        return jsonify(api_keys_updated=True)
+    else:
+        return jsonify(token_is_valid=False), 403
+
+@app.route('/api/get_api_keys', methods=['POST'])
+def get_api_keys():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        user = User.query.filter_by(email=incoming["email"]).first_or_404()
+        return jsonify(
+            api_pubkey=user.api_pubkey,
+            api_privkey=user.api_privkey
+        )
     else:
         return jsonify(token_is_valid=False), 403

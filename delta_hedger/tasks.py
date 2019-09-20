@@ -10,12 +10,6 @@ import time
 
 logger = get_task_logger(__name__)
 
-
-# GATEIO API v.4
-configuration = gate_api.Configuration()
-configuration.key = '5f5430e6102ad1c31486b56ea7ab9c5c'
-configuration.secret = '3974ca809f6525f0c2bd5866e5fa44e28633a7e4983f707f698952bb10acd047'
-
 @celery_app.task(name='deltahedge.processing')
 def start_delta_hedge(interval_min,interval_max, time_period, deribitKey, deribitSecret):
     '''Deribit Part'''
@@ -23,6 +17,11 @@ def start_delta_hedge(interval_min,interval_max, time_period, deribitKey, deribi
     index = deribitClient.index("BTC")
     # index = requests.get("https://test.deribit.com/api/v2/public/get_index?currency=ETH")
     # index = json.loads(index.content)
+
+    # GATEIO API v.4
+    configuration = gate_api.Configuration()
+    configuration.key = '5f5430e6102ad1c31486b56ea7ab9c5c'
+    configuration.secret = '3974ca809f6525f0c2bd5866e5fa44e28633a7e4983f707f698952bb10acd047'
 
     ''' GateIo part'''
     # create an instance of the API class

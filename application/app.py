@@ -188,6 +188,19 @@ def kill_task():
     else:
         return jsonify(token_is_valid=False), 403
 
+@app.route('/api/get_task_state', methods=['POST'])
+def get_task_state():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        pid = incoming["pid"]
+        res = celery_app.AsyncResult(pid)
+        print(res.state)
+
+        return jsonify(task_state=res.state)
+    else:
+        return jsonify(token_is_valid=False), 403
 
 @app.route('/api/update_api_keys', methods=['POST'])
 def update_api_keys():

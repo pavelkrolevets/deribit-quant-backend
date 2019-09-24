@@ -105,15 +105,25 @@ def compute_bsm():
     if is_valid:
         option_values=[]
         data = incoming['data']
-        if incoming['option_type']=='call':
+        if incoming['option_type']=='call' and incoming['direction']=='buy':
             for item in data:
                 item = json.loads(item)
                 call = call_option(S0=item['S0'], K=item['K'], T=item['T'], r=item['r'], sigma=item['sigma'])
-                option_values.append(call.value())
-        if incoming['option_type']=='put':
+                option_values.append(call.value()-incoming['trade_price'])
+        if incoming['option_type'] == 'call' and incoming['direction'] == 'sell':
+            for item in data:
+                item = json.loads(item)
+                call = call_option(S0=item['S0'], K=item['K'], T=item['T'], r=item['r'], sigma=item['sigma'])
+                option_values.append(-call.value()+incoming['trade_price'])
+        if incoming['option_type']=='put' and incoming['direction']=='buy':
             for item in data:
                 put = put_option(S0=item.S0, K=item.K, T=item.T, r=item.r, sigma=item.sigma)
-                option_values.append(put.value())
+                option_values.append(put.value()-incoming['trade_price'])
+
+        if incoming['option_type']=='put' and incoming['direction']=='sell':
+            for item in data:
+                put = put_option(S0=item.S0, K=item.K, T=item.T, r=item.r, sigma=item.sigma)
+                option_values.append(-put.value()+incoming['trade_price'])
 
         return jsonify(option_values=option_values)
     else:

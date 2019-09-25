@@ -8,6 +8,7 @@ import json
 from delta_hedger.tasks import start_delta_hedge
 from celery.result import AsyncResult
 from delta_hedger.celery_app import celery_app
+from finance.pnl import *
 
 celery_app.conf.broker_url = 'redis://localhost:6379/0'
 
@@ -237,5 +238,19 @@ def get_api_keys():
             api_pubkey=user.api_pubkey,
             api_privkey=user.api_privkey
         )
+    else:
+        return jsonify(token_is_valid=False), 403
+
+
+@app.route('/api/compute_pnl', methods=['POST'])
+def compute_pnl():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        user = User.query.filter_by(email=incoming["email"]).first_or_404()
+        pnl, pnl_at_exp = compute_global_pnl(user.api_pubkey, user.api_privkey, 7000, 14000, 100, 0.03, 0.8)
+        return jsonify(pnl=pnl,
+                       pnl_at_exp=pnl_at_exp)
     else:
         return jsonify(token_is_valid=False), 403

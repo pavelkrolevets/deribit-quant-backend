@@ -26,7 +26,7 @@ def compute_global_pnl(deribitKey, deribitSecret, range_min, range_max, step, ri
             if position['kind'] == 'option':
                 now = datetime.now()
                 expiration = datetime.strptime(instrument[1], '%d%b%y')
-                T = (expiration - now).days/365
+                T = (expiration - now).seconds/(365*24*60*60)
                 if instrument[3] == "C":
                     call = call_option(S0=i/i, K=int(instrument[2])/i, T=T, r=risk_free, sigma=vola)
                     pos_sum += + call.value() * float(position['size']) * i - float(position['averagePrice']) * float(position['size']) * i
@@ -50,7 +50,7 @@ def compute_global_pnl(deribitKey, deribitSecret, range_min, range_max, step, ri
 
             if position['kind'] == 'option':
                 if instrument[3] == "C":
-                    call = call_option(S0=i/i, K=int(instrument[2])/i, T=0.0001, r=risk_free, sigma=vola)
+                    call = call_option(S0=i/i, K=int(instrument[2])/i, T=0.00001, r=risk_free, sigma=vola)
                     pos_sum += + call.value() * position['size'] * i- float(position['averagePrice']) * float(position['size']) * i
 
                 if instrument[3] == "P":

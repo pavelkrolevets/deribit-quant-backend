@@ -5,7 +5,7 @@ from application.app import app, db
 
 migrate = Migrate(app, db)
 manager = Manager(app)
-server = Server(host="0.0.0.0", port=5002, threaded=True, ssl_crt='/etc/letsencrypt/live/ton618.tech/fullchain.pem', ssl_key='/etc/letsencrypt/live/ton618.tech/privkey.pem')
+server = Server(host="0.0.0.0", port=5002, threaded=True)
 
 # migrations
 manager.add_command('db', MigrateCommand)

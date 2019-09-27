@@ -249,7 +249,12 @@ def compute_pnl():
 
     if is_valid:
         user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        pnl, pnl_at_exp = compute_global_pnl(user.api_pubkey, user.api_privkey, 7000, 14000, 100, 0.03, 0.8)
+        pnl, pnl_at_exp = compute_global_pnl(user.api_pubkey, user.api_privkey,
+                                             int(incoming["range_min"]),
+                                             int(incoming["range_max"]),
+                                             int(incoming["step"]),
+                                             float(incoming["risk_free"]),
+                                             float(incoming["vola"]))
         return jsonify(pnl=pnl,
                        pnl_at_exp=pnl_at_exp)
     else:

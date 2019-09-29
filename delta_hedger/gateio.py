@@ -34,10 +34,10 @@ def getVola(api_instance, frame, interval, currency_pair, window, plot):
 
     # convert to Pandas dataframe
     data = pd.DataFrame(np.array(history).reshape(frame, 6), columns=['Time', 'Volume', 'Open', 'High', 'Low', 'Close'])
-    # tmpList = []
-    # for i in data['Time']:
-    #     tmpList.append(datetime.utcfromtimestamp(int(i)).strftime('%Y-%m-%d'))
-    # data.index = tmpList
+    tmpList = []
+    for i in data['Time']:
+        tmpList.append(datetime.utcfromtimestamp(int(i)).strftime('%Y-%m-%d %H:%M:%S'))
+    data.index = tmpList
     data["Close"] = data["Close"].astype(float)
     data["Open"] = data["Open"].astype(float)
     data["High"] = data["High"].astype(float)

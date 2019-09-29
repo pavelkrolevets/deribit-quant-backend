@@ -9,6 +9,7 @@ from delta_hedger.tasks import start_delta_hedge
 from celery.result import AsyncResult
 from delta_hedger.celery_app import celery_app
 from finance.pnl import *
+from finance.vola import *
 
 celery_app.conf.broker_url = 'redis://localhost:6379/0'
 
@@ -257,5 +258,17 @@ def compute_pnl():
                                              float(incoming["vola"]))
         return jsonify(pnl=pnl,
                        pnl_at_exp=pnl_at_exp)
+    else:
+        return jsonify(token_is_valid=False), 403
+
+@app.route('/api/get_hist_vola', methods=['POST'])
+def get_hist_vola():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        user = User.query.filter_by(email=incoming["email"]).first_or_404()
+        hist_vola = getHistVola()
+        return jsonify(hist_vola=hist_vola)
     else:
         return jsonify(token_is_valid=False), 403

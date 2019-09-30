@@ -74,7 +74,7 @@ class call_option(object):
         # Parameters
         M = 50
         dt = self.T / M
-        I = 250000 * 2
+        I = 25000 * 2
 
         # Simulating I paths with M time steps
         ran = random.standard_normal((M + 1, I))
@@ -162,7 +162,7 @@ class put_option(object):
         # Parameters
         M = 50
         dt = self.T / M
-        I = 250000 * 2
+        I = 25000 * 2
 
         # Simulating I paths with M time steps
         ran = random.standard_normal((M + 1, I))

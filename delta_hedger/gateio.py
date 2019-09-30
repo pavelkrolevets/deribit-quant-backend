@@ -44,7 +44,16 @@ def getVola(api_instance, frame, interval, currency_pair, window, plot):
     data["Low"] = data["Low"].astype(float)
     data['log_ret'] = np.log(data['Close'] / data['Close'].shift(1))
 
-    data['vola'] = data['log_ret'].rolling(window).std()*np.sqrt(365*24)
+    vola_adj = 0
+
+    if interval == '1m':
+        vola_adj = np.sqrt(365* 24* 60)
+    if interval == '1h':
+        vola_adj = np.sqrt(365 * 24)
+    if interval =='1d':
+        vola_adj = np.sqrt(365)
+
+    data['vola'] = data['log_ret'].rolling(window).std() * vola_adj
 
     if plot==True:
         """Plot result"""

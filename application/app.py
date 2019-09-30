@@ -268,7 +268,7 @@ def get_hist_vola():
 
     if is_valid:
         user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        hist_vola = getHistVola()
+        hist_vola = getHistVola(int(incoming["window"]), incoming["timeframe"])
         return jsonify(hist_vola=hist_vola)
     else:
         return jsonify(token_is_valid=False), 403

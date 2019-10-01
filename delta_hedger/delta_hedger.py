@@ -29,7 +29,7 @@ def hedgeDelta(deribitClient, index, hist_vola, interval_min, interval_max):
 
         while (globalDelta >= interval_max) or (globalDelta <= interval_min):
             ## futures contract
-            fut = "BTC-" + str("27SEP19")
+            fut = "BTC-" + str("27DEC19")
 
             ## get futures positions
             orderBook = deribitClient.getorderbook(fut)

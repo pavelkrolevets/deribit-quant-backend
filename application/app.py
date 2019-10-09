@@ -272,3 +272,22 @@ def get_hist_vola():
         return jsonify(hist_vola=hist_vola)
     else:
         return jsonify(token_is_valid=False), 403
+
+@app.route('/api/analize', methods=['POST'])
+def analize():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        user = User.query.filter_by(email=incoming["email"]).first_or_404()
+        pnl, pnl_at_exp = analize_positions(user.api_pubkey, user.api_privkey,
+                                            incoming["range_min"],
+                                             int(incoming["range_min"]),
+                                             int(incoming["range_max"]),
+                                             int(incoming["step"]),
+                                             float(incoming["risk_free"]),
+                                             float(incoming["vola"]))
+        return jsonify(pnl=pnl,
+                       pnl_at_exp=pnl_at_exp)
+    else:
+        return jsonify(token_is_valid=False), 403

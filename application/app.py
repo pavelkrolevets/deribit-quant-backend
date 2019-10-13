@@ -141,10 +141,15 @@ def start_delta_hedger():
         delta_hedge_task = start_delta_hedge.delay(float(incoming["interval_min"]),
                                                    float(incoming["interval_max"]),
                                                    float(incoming["time_period"]),
+                                                   incoming["instrument"],
                                                    user.api_pubkey,
                                                    user.api_privkey)
         task = Task(
             pid=delta_hedge_task.task_id,
+            timeinterval=float(incoming["time_period"]),
+            delta_min = float(incoming["interval_min"]),
+            delta_max = float(incoming["interval_max"]),
+            instrument = incoming["instrument"]
         )
         user.tasks.append(task)
         db.session.add(task)
@@ -164,11 +169,19 @@ def get_tasks():
         id=[]
         pid=[]
         timestamp=[]
+        timeinterval=[]
+        delta_min=[]
+        delta_max=[]
+        instrument=[]
         for item in tasks:
             id.append(item.id),
             pid.append(item.pid),
             timestamp.append(item.timestamp.strftime("%Y-%m-%d %H:%M:%S"))
-        result = [{"id": i, "pid": p, "timestamp": t} for i, p, t in zip(id, pid, timestamp)]
+            timeinterval.append(item.timeinterval)
+            delta_min.append(item.delta_min)
+            delta_max.append(item.delta_max)
+            instrument.append(item.instrument)
+        result = [{"id": i, "pid": p, "timestamp": t, "timeinterval": ti, "delta_min":dmin, "delta_max":dmax, "instrument": instr} for i, p, t, ti, dmin, dmax, instr in zip(id, pid, timestamp, timeinterval, delta_min, delta_max, instrument)]
         return json.dumps(result)
     else:
         return jsonify(token_is_valid=False), 403

@@ -19,7 +19,6 @@ def compute_global_pnl(deribitKey, deribitSecret, range_min, range_max, step, ri
     pnl = []
 
     for i in range(range_min, range_max, step):
-        print("Range",i)
         pos_sum = 0
         for position in positions:
             instrument = position['instrument'].split('-')
@@ -75,7 +74,6 @@ def analize_positions(deribitKey, deribitSecret, positions, range_min, range_max
     pnl = []
 
     for i in range(range_min, range_max, step):
-        print("Range", i)
         pos_sum = 0
         for position in positions:
             instrument = position['instrument'].split('-')

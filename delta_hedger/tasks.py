@@ -11,10 +11,11 @@ import time
 logger = get_task_logger(__name__)
 
 @celery_app.task(name='deltahedge.processing')
-def start_delta_hedge(interval_min,interval_max, time_period, deribitKey, deribitSecret):
+def start_delta_hedge(interval_min,interval_max, time_period, instrument, deribitKey, deribitSecret):
     '''Deribit Part'''
     deribitClient = RestClient(deribitKey, deribitSecret)
-    index = deribitClient.index("BTC")
+    index = deribitClient.index(instrument)
+    print("Index", index)
     # index = requests.get("https://test.deribit.com/api/v2/public/get_index?currency=ETH")
     # index = json.loads(index.content)
 
@@ -27,8 +28,14 @@ def start_delta_hedge(interval_min,interval_max, time_period, deribitKey, deribi
     # create an instance of the API class
     api_spot = gate_api.SpotApi(gate_api.ApiClient(configuration))
 
-    ''' Run delta hedger'''
-    while True:
-        histVola = getVola(api_spot, 1000, '1h', 'BTC_USDT', 24 * 7, False)
-        hedgeDelta(deribitClient, index['btc'], histVola, interval_min, interval_max)
-        time.sleep(time_period)
+    '''Run delta hedger'''
+    if instrument=="BTC":
+        while True:
+            histVola = getVola(api_spot, 1000, '1h', 'BTC_USDT', 24 * 7, False)
+            hedgeDelta(deribitClient, index['btc'], histVola, interval_min, interval_max, instrument)
+            time.sleep(time_period)
+    elif instrument=="ETH":
+        while True:
+            histVola = getVola(api_spot, 1000, '1h', 'ETH_USDT', 24 * 7, False)
+            hedgeDelta(deribitClient, index['eth'], histVola, interval_min, interval_max, instrument)
+            time.sleep(time_period)

@@ -3,15 +3,15 @@
 from math import log, sqrt, exp
 import time
 
-def hedgeDelta(deribitClient, index, hist_vola, interval_min, interval_max):
+def hedgeDelta(deribitClient, index, hist_vola, interval_min, interval_max, instrument):
     print("Index values", index)
     print("Hist vola", hist_vola.iloc[-1])
 
     ## Get account equity
 
     try:
-        account = deribitClient.account("BTC", True)
-        print("Account equity", account['equity'])
+        account = deribitClient.account(instrument, True)
+        print("Account equity", account['equity'], "Instreument", instrument)
     except Exception:
         print("Error getting account...")
         pass
@@ -22,14 +22,14 @@ def hedgeDelta(deribitClient, index, hist_vola, interval_min, interval_max):
 
     ## Get global delta
     try:
-        globalDelta = deribitClient.account("BTC", True)["deltaTotal"]
-        print("deltaTotal", globalDelta)
+        globalDelta = deribitClient.account(instrument, True)["deltaTotal"]
+        print("deltaTotal", globalDelta, "Instrument", instrument)
 
         ## Make delta 0 if its out of range
 
         while (globalDelta >= interval_max) or (globalDelta <= interval_min):
             ## futures contract
-            fut = "BTC-" + str("27DEC19")
+            fut = instrument+"-" + str("27DEC19")
 
             ## get futures positions
             orderBook = deribitClient.getorderbook(fut)
@@ -67,8 +67,8 @@ def hedgeDelta(deribitClient, index, hist_vola, interval_min, interval_max):
                                               time_in_force="fill_or_kill", postOnly=None, label=None)
                     print(trade)
 
-            globalDelta = deribitClient.account("BTC", True)["deltaTotal"]
-            print("Global delta", globalDelta)
+            globalDelta = deribitClient.account(instrument, True)["deltaTotal"]
+            print("deltaTotal", globalDelta, "Instrument", instrument)
 
             time.sleep(5)
 

@@ -76,7 +76,7 @@ def analize_positions(deribitKey, deribitSecret, positions, range_min, range_max
     for i in range(range_min, range_max, step):
         pos_sum = 0
         for position in positions:
-            instrument = position['instrument'].split('-')
+            instrument = position['instrumentName'].split('-')
 
             if position['kind'] == 'option':
                 now = datetime.now()
@@ -84,15 +84,24 @@ def analize_positions(deribitKey, deribitSecret, positions, range_min, range_max
                 T = (expiration - now).seconds/(365*24*60*60)
                 if instrument[3] == "C":
                     call = call_option(S0=i/i, K=int(instrument[2])/i, T=T, r=risk_free, sigma=vola)
-                    pos_sum += call.value() * float(position['size']) * i - float(position['averagePrice']) * float(position['size']) * i
+                    if position['direction'] == "buy":
+                        pos_sum += call.value() * float(position['size']) * i - float(position['markPrice']) * float(position['size']) * i
+                    if position['direction'] == "sell":
+                        pos_sum += -call.value() * float(position['size']) * i + float(position['markPrice']) * float(position['size']) * i
 
                 if instrument[3] == "P":
                     put = put_option(S0=i, K=int(instrument[2]), T=T, r=risk_free, sigma=vola)
-                    pos_sum += put.value() * float(position['size']) - float(position['averagePrice']) * float(position['size']) * i
+                    if position['direction'] == "buy":
+                        pos_sum += put.value() * float(position['size']) - float(position['markPrice']) * float(position['size']) * i
+                    if position['direction'] == "sell":
+                        pos_sum += -put.value() * float(position['size']) + float(position['markPrice']) * float(
+                            position['size']) * i
 
             if position['kind'] == 'future':
-                pos_sum += float(position['sizeBtc']) * i - float(position['sizeBtc']) * float(position['averagePrice'])
-
+                if position['direction'] == "buy":
+                    pos_sum += float(position['size']) * i - float(position['size']) * float(position['markPrice'])
+                if position['direction'] == "sell":
+                    pos_sum += -float(position['size']) * i + float(position['size']) * float(position['markPrice'])
 
         pnl.append({'x':i, 'y':pos_sum})
 
@@ -101,19 +110,32 @@ def analize_positions(deribitKey, deribitSecret, positions, range_min, range_max
     for i in range(range_min, range_max, step):
         pos_sum = 0
         for position in positions:
-            instrument = position['instrument'].split('-')
+            instrument = position['instrumentName'].split('-')
 
             if position['kind'] == 'option':
                 if instrument[3] == "C":
                     call = call_option(S0=i/i, K=int(instrument[2])/i, T=0.00001, r=risk_free, sigma=vola)
-                    pos_sum += call.value() * position['size'] * i- float(position['averagePrice']) * float(position['size']) * i
+                    if position['direction'] == "buy":
+                        pos_sum += call.value() * float(position['size']) * i - float(position['markPrice']) * float(
+                            position['size']) * i
+                    if position['direction'] == "sell":
+                        pos_sum += -call.value() * float(position['size']) * i + float(position['markPrice']) * float(
+                            position['size']) * i
 
                 if instrument[3] == "P":
                     put = put_option(S0=i, K=int(instrument[2]), T=0.0001, r=risk_free, sigma=vola)
-                    pos_sum += + put.value() * float(position['size']) - float(position['averagePrice']) * float(position['size']) * i
+                    if position['direction'] == "buy":
+                        pos_sum += put.value() * float(position['size']) - float(position['markPrice']) * float(
+                            position['size']) * i
+                    if position['direction'] == "sell":
+                        pos_sum += -put.value() * float(position['size']) + float(position['markPrice']) * float(
+                            position['size']) * i
 
             if position['kind'] == 'future':
-                pos_sum += float(position['sizeBtc']) * i - float(position['sizeBtc']) * float(position['averagePrice'])
+                if position['direction'] == "buy":
+                    pos_sum += float(position['size']) * i - float(position['size']) * float(position['markPrice'])
+                if position['direction'] == "sell":
+                    pos_sum += -float(position['size']) * i + float(position['size']) * float(position['markPrice'])
 
         pnl_at_exp.append({'x':i, 'y':pos_sum})
 

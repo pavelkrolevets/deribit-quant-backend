@@ -6,7 +6,7 @@ import time
 
 
 
-def getHistVola(window, timeframe):
+def getHistVola(window, timeframe, instrument):
     # GATEIO API v.4
     configuration = gate_api.Configuration()
     configuration.key = '5f5430e6102ad1c31486b56ea7ab9c5c'
@@ -16,7 +16,7 @@ def getHistVola(window, timeframe):
     # create an instance of the API class
     api_spot = gate_api.SpotApi(gate_api.ApiClient(configuration))
 
-    histVola = getVola(api_spot, 600, timeframe, 'BTC_USDT', window, False)
+    histVola = getVola(api_spot, 600, timeframe, (instrument+"_USDT"), window, False)
     hist_vola_graph = []
     for i in range(24*7, len(histVola)):
         hist_vola_graph.append({'x': i, 'y': histVola.iloc[i]})

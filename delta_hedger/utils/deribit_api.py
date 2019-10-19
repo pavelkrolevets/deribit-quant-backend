@@ -13,7 +13,7 @@ class RestClient(object):
         if url:
             self.url = url
         else:
-            self.url = "https://test.deribit.com"
+            self.url = "https://www.deribit.com"
 
     def request(self, action, data):
         response = None

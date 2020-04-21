@@ -1,5 +1,5 @@
 from flask import request, jsonify, g
-from .models import User, Task
+from .models import User, Task, BtcFutures, EthFutures
 from index import app, db
 from sqlalchemy.exc import IntegrityError
 from .utils.auth import generate_token, requires_auth, verify_token
@@ -302,5 +302,28 @@ def analaize_positions():
                                              float(incoming["vola"]))
         return jsonify(pnl=pnl,
                        pnl_at_exp=pnl_at_exp)
+    else:
+        return jsonify(token_is_valid=False), 403
+
+
+@app.route('/api/get_btc_contango', methods=['POST'])
+def get_btc_returns():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        data = BtcFutures.query.filter(BtcFutures.timestamp).all()
+        return jsonify(json_list=[i.serialize for i in data[-100:]])
+    else:
+        return jsonify(token_is_valid=False), 403
+
+@app.route('/api/get_eth_contango', methods=['POST'])
+def get_eth_returns():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        data = EthFutures.query.filter(EthFutures.timestamp).all()
+        return jsonify(json_list=[i.serialize for i in data[-100:]])
     else:
         return jsonify(token_is_valid=False), 403

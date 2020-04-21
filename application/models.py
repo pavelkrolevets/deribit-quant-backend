@@ -40,3 +40,48 @@ class Task(db.Model):
     instrument = db.Column(db.String(255))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     user = db.relationship("User", back_populates="tasks")
+
+class BtcFutures(db.Model):
+    __tablename__ = 'futures_contango_btc'
+    id = db.Column(db.Integer, primary_key=True)
+    perpetual = db.Column(db.Float)
+    three_months = db.Column(db.Float)
+    six_months = db.Column(db.Float)
+    timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+
+    @property
+    def serialize(self):
+        """Return object data in easily serializable format"""
+        return {
+            'id'         : self.id,
+            'perpetual'  : self.perpetual,
+            'three_months'  : self.three_months,
+            'six_months'  : self.six_months,
+            'timestamp': self.timestamp,
+        }
+
+class EthFutures(db.Model):
+    __tablename__ = 'futures_contango_eth'
+    id = db.Column(db.Integer, primary_key=True)
+    perpetual = db.Column(db.Float)
+    three_months = db.Column(db.Float)
+    six_months = db.Column(db.Float)
+    timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+
+    @property
+    def serialize(self):
+        """Return object data in easily serializable format"""
+        return {
+            'id'         : self.id,
+            'perpetual'  : self.perpetual,
+            'three_months'  : self.three_months,
+            'six_months'  : self.six_months,
+            'timestamp': self.timestamp,
+        }
+
+def dump_datetime(value):
+    """Deserialize datetime object into string form for JSON processing."""
+    if value is None:
+        return None
+    return  value.timestamp()
+    # return [value.strftime("%Y-%m-%d"), value.strftime("%H:%M:%S")]

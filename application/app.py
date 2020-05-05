@@ -150,7 +150,8 @@ def start_delta_hedger():
             timeinterval=float(incoming["time_period"]),
             delta_min = float(incoming["interval_min"]),
             delta_max = float(incoming["interval_max"]),
-            instrument = incoming["instrument"]
+            instrument = incoming["instrument"],
+            is_running = True
         )
         user.tasks.append(task)
         db.session.add(task)
@@ -166,7 +167,7 @@ def get_tasks():
 
     if is_valid:
         user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        tasks = user.tasks
+        tasks = Task.query.filter_by(is_running=True, user_id=user.id)
         id=[]
         pid=[]
         timestamp=[]
@@ -174,6 +175,7 @@ def get_tasks():
         delta_min=[]
         delta_max=[]
         instrument=[]
+        is_running = []
         for item in tasks:
             id.append(item.id),
             pid.append(item.pid),
@@ -182,7 +184,8 @@ def get_tasks():
             delta_min.append(item.delta_min)
             delta_max.append(item.delta_max)
             instrument.append(item.instrument)
-        result = [{"id": i, "pid": p, "timestamp": t, "timeinterval": ti, "delta_min":dmin, "delta_max":dmax, "instrument": instr} for i, p, t, ti, dmin, dmax, instr in zip(id, pid, timestamp, timeinterval, delta_min, delta_max, instrument)]
+            is_running.append(item.is_running)
+        result = [{"id": i, "pid": p, "timestamp": t, "timeinterval": ti, "delta_min":dmin, "delta_max":dmax, "instrument": instr, "is_run": is_run} for i, p, t, ti, dmin, dmax, instr, is_run in zip(id, pid, timestamp, timeinterval, delta_min, delta_max, instrument, is_running)]
         return json.dumps(result)
     else:
         return jsonify(token_is_valid=False), 403
@@ -194,23 +197,22 @@ def kill_task():
 
     if is_valid:
         pid = incoming["pid"]
-        res = AsyncResult(pid, app=celery_app)
-        print(res.state)
-
         try:
             celery_app.control.revoke(pid, terminate=True, signal='SIGKILL')
         except Exception:
             return jsonify(task_stopped=False)
 
-        res = celery_app.AsyncResult(pid)
-        print(res.state)
-
         user = User.query.filter_by(email=incoming["email"]).first_or_404()
         task = Task.query.filter_by(pid=pid).first_or_404()
-        user.tasks.remove(task)
-        db.session.commit()
-
-        return jsonify(task_stopped=True)
+        ## check if a task is really revoked
+        res = celery_app.AsyncResult(pid)
+        if res.state == 'REVOKED':
+            task.is_running = False
+            db.session.add(task)
+            db.session.commit()
+            return jsonify(task_stopped=True)
+        else:
+            return jsonify(task_stopped=False)
     else:
         return jsonify(token_is_valid=False), 403
 

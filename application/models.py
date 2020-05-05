@@ -38,6 +38,7 @@ class Task(db.Model):
     delta_min = db.Column(db.Float)
     delta_max = db.Column(db.Float)
     instrument = db.Column(db.String(255))
+    is_running = db.Column(db.Boolean)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     user = db.relationship("User", back_populates="tasks")
 

@@ -34,10 +34,10 @@ def getVola(api_instance, frame, interval, currency_pair, window, plot):
 
     # convert to Pandas dataframe
     data = pd.DataFrame(np.array(history).reshape(frame, 6), columns=['Time', 'Volume', 'Open', 'High', 'Low', 'Close'])
-    tmpList = []
+    dateList = []
     for i in data['Time']:
-        tmpList.append(datetime.utcfromtimestamp(int(i)).strftime('%Y-%m-%d %H:%M:%S'))
-    data.index = tmpList
+        dateList.append(datetime.utcfromtimestamp(int(i)))
+    data.index = dateList
     data["Close"] = data["Close"].astype(float)
     data["Open"] = data["Open"].astype(float)
     data["High"] = data["High"].astype(float)
@@ -55,14 +55,15 @@ def getVola(api_instance, frame, interval, currency_pair, window, plot):
 
     data['vola'] = data['log_ret'].rolling(window).std() * vola_adj
 
-    if plot==True:
-        """Plot result"""
-        plt.plot(data['vola'])
-        plt.grid(False)
-        plt.xlabel('time step')
-        plt.ylabel("level")
-        plt.show()
-    return data['vola']
+    # if plot==True:
+    #     """Plot result"""
+    #     plt.plot(data['vola'])
+    #     plt.grid(False)
+    #     plt.xlabel('time step')
+    #     plt.ylabel("level")
+    #     plt.show()
+    # print(data)
+    return data
 
 if __name__ == '__main__':
     api_spot = gate_api.SpotApi(gate_api.ApiClient(configuration))

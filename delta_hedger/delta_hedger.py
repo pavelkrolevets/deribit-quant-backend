@@ -3,15 +3,15 @@
 from math import log, sqrt, exp
 import time
 
-def hedgeDelta(deribitClient, index, hist_vola, interval_min, interval_max, instrument):
+def hedgeDelta(deribitClient, index, interval_min, interval_max, currency, instrument):
     print("Index values", index)
-    print("Hist vola", hist_vola.iloc[-1])
+    # print("Hist vola", hist_vola.iloc[-1])
 
     ## Get account equity
 
     try:
-        account = deribitClient.account(instrument, True)
-        print("Account equity", account['equity'], "Instreument", instrument)
+        account = deribitClient.account(currency, True)
+        print("Account equity", account['equity'], "Currency", currency)
     except Exception:
         print("Error getting account...")
         pass
@@ -22,17 +22,17 @@ def hedgeDelta(deribitClient, index, hist_vola, interval_min, interval_max, inst
 
     ## Get global delta
     try:
-        globalDelta = deribitClient.account(instrument, True)["deltaTotal"]
-        print("deltaTotal", globalDelta, "Instrument", instrument)
+        globalDelta = deribitClient.account(currency, True)["deltaTotal"]
+        print("deltaTotal", globalDelta, "Instrument", currency)
 
         ## Make delta 0 if its out of range
 
         while (globalDelta >= interval_max) or (globalDelta <= interval_min):
             ## futures contract
-            fut = instrument+"-" + str("27DEC19")
+            # fut = currency+"-" + str("27DEC19")
 
             ## get futures positions
-            orderBook = deribitClient.getorderbook(fut)
+            orderBook = deribitClient.getorderbook(instrument)
             # print(orderBook)
 
             ## Placing orders
@@ -43,13 +43,13 @@ def hedgeDelta(deribitClient, index, hist_vola, interval_min, interval_max, inst
                 if bestBidAmount > sqrt(globalDelta**2)*index:
                     ## place the order
                     try:
-                        trade = deribitClient.sell(fut, sqrt(globalDelta**2)*index/10, bestBidPrice, type="limit", time_in_force= "fill_or_kill", postOnly=None, label=None)
+                        trade = deribitClient.sell(instrument, sqrt(globalDelta**2)*index/10, bestBidPrice, type="limit", time_in_force= "fill_or_kill", postOnly=None, label=None)
                         print(trade)
                     except Exception:
                         print("Error placing the trade.")
                 else:
                     ## place the order
-                    trade = deribitClient.sell(fut, bestBidAmount / 10, bestBidPrice, type="limit",
+                    trade = deribitClient.sell(instrument, bestBidAmount / 10, bestBidPrice, type="limit",
                                                time_in_force="fill_or_kill", postOnly=None, label=None)
                     print(trade)
 
@@ -59,17 +59,16 @@ def hedgeDelta(deribitClient, index, hist_vola, interval_min, interval_max, inst
                 print("Best ask price", bestAskPrice, "Best ask amount", bestAskAmount)
                 if bestAskAmount > sqrt(globalDelta**2)*index:
                     ## place the order
-                    trade = deribitClient.buy(fut, sqrt(globalDelta**2)*index/10, bestAskPrice, type="limit", time_in_force= "fill_or_kill", postOnly=None, label=None)
+                    trade = deribitClient.buy(instrument, sqrt(globalDelta**2)*index/10, bestAskPrice, type="limit", time_in_force= "fill_or_kill", postOnly=None, label=None)
                     print(trade)
                 else:
                     ## place the order
-                    trade = deribitClient.buy(fut, bestAskAmount/10, bestAskPrice, type="limit",
+                    trade = deribitClient.buy(instrument, bestAskAmount/10, bestAskPrice, type="limit",
                                               time_in_force="fill_or_kill", postOnly=None, label=None)
                     print(trade)
 
-            globalDelta = deribitClient.account(instrument, True)["deltaTotal"]
-            print("deltaTotal", globalDelta, "Instrument", instrument)
-
+            globalDelta = deribitClient.account(currency, True)["deltaTotal"]
+            print("deltaTotal", globalDelta, "Currency", currency)
             time.sleep(5)
 
     except Exception:

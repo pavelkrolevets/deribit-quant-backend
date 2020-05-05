@@ -141,6 +141,7 @@ def start_delta_hedger():
         delta_hedge_task = start_delta_hedge.delay(float(incoming["interval_min"]),
                                                    float(incoming["interval_max"]),
                                                    float(incoming["time_period"]),
+                                                   incoming["currency"],
                                                    incoming["instrument"],
                                                    user.api_pubkey,
                                                    user.api_privkey)
@@ -313,7 +314,7 @@ def get_btc_returns():
 
     if is_valid:
         data = BtcFutures.query.filter(BtcFutures.timestamp).all()
-        return jsonify(json_list=[i.serialize for i in data[-100:]])
+        return jsonify(json_list=[i.serialize for i in data[-1000:]])
     else:
         return jsonify(token_is_valid=False), 403
 
@@ -324,6 +325,6 @@ def get_eth_returns():
 
     if is_valid:
         data = EthFutures.query.filter(EthFutures.timestamp).all()
-        return jsonify(json_list=[i.serialize for i in data[-100:]])
+        return jsonify(json_list=[i.serialize for i in data[-1000:]])
     else:
         return jsonify(token_is_valid=False), 403

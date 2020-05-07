@@ -160,14 +160,14 @@ def start_delta_hedger():
     else:
         return jsonify(token_is_valid=False), 403
 
-@app.route('/api/get_tasks', methods=['POST'])
-def get_tasks():
+@app.route('/api/get_runnung_tasks', methods=['POST'])
+def get_running_tasks():
     incoming = request.get_json()
     is_valid = verify_token(incoming["token"])
 
     if is_valid:
         user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        tasks = Task.query.filter_by(is_running=True, user_id=user.id)
+        tasks = Task.query.filter_by(is_running=incoming["is_running"], user_id=user.id)
         id=[]
         pid=[]
         timestamp=[]

@@ -17,10 +17,10 @@ def getHistVola(window, timeframe, instrument):
     api_spot = gate_api.SpotApi(gate_api.ApiClient(configuration))
 
     histVola = getVola(api_spot, 600, timeframe, (instrument+"_USDT"), window, False)
-    # print(histVola)
+    print(histVola)
     hist_vola_graph = []
     for i in range(24*7, len(histVola)):
-        hist_vola_graph.append({'x': i, 'y': histVola["vola"].iloc[i]})
+        hist_vola_graph.append({'x': histVola["Time"].iloc[i], 'y': histVola["vola"].iloc[i]})
 
     # for index, row in histVola.iterrows():
     #     #     # print(row.name)

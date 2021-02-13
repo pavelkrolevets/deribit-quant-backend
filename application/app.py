@@ -233,27 +233,28 @@ def get_task_state():
 @app.route('/api/update_api_keys', methods=['POST'])
 def update_api_keys():
     incoming = request.get_json()
-    is_valid = verify_token(incoming["token"])
-
-    if is_valid:
-        user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        user.api_pubkey = incoming["api_pubkey"]
-        user.api_privkey = incoming["api_privkey"]
+    user = User.get_user_with_email_and_password(incoming["email"], incoming["password"])
+    
+    if user:
+        user.api_pubkey  = user.encrypt_api_key(incoming["password"], incoming["api_pubkey"]) 
+        user.api_privkey = user.encrypt_api_key(incoming["password"], incoming["api_privkey"]) 
         db.session.commit()
-        return jsonify(api_keys_updated=True)
+        return jsonify(
+            api_keys_updated=True,
+            api_pubkey=user.dencrypt_api_key(incoming["password"], user.api_pubkey),
+            api_privkey=user.dencrypt_api_key(incoming["password"], user.api_privkey)
+            )
     else:
         return jsonify(token_is_valid=False), 403
 
 @app.route('/api/get_api_keys', methods=['POST'])
 def get_api_keys():
     incoming = request.get_json()
-    is_valid = verify_token(incoming["token"])
-
-    if is_valid:
-        user = User.query.filter_by(email=incoming["email"]).first_or_404()
+    user = User.get_user_with_email_and_password(incoming["email"], incoming["password"])
+    if user:
         return jsonify(
-            api_pubkey=user.api_pubkey,
-            api_privkey=user.api_privkey
+            api_pubkey=user.dencrypt_api_key(incoming["password"], user.api_pubkey),
+            api_privkey=user.dencrypt_api_key(incoming["password"], user.api_privkey)
         )
     else:
         return jsonify(token_is_valid=False), 403

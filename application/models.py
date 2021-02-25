@@ -49,8 +49,7 @@ class User(db.Model):
         key = kdf.derive(password.encode())
         api_key_enc = aes_key_wrap_with_padding(key, api_key.encode())
         if api_key_enc:
-            print(base64.urlsafe_b64encode(api_key_enc).decode())
-            return base64.urlsafe_b64encode(api_key_enc).decode()
+            return base64.urlsafe_b64encode(api_key_enc).decode("utf-8")
         else:
             return None
 
@@ -68,7 +67,7 @@ class User(db.Model):
         key = kdf.derive(password.encode())
         api_key = aes_key_unwrap_with_padding(key, api_key_enc)
         if api_key:
-            return api_key.decode()
+            return api_key.decode("utf-8")
         else:
             return None
 

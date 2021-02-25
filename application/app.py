@@ -10,6 +10,7 @@ from celery.result import AsyncResult
 from delta_hedger.celery_app import celery_app
 from finance.pnl import *
 from finance.vola import *
+from delta_hedger.utils.deribit_api import RestClient
 
 celery_app.conf.broker_url = 'redis://localhost:6379/0'
 
@@ -134,31 +135,35 @@ def compute_bsm():
 @app.route('/api/start_delta_hedger', methods=['POST'])
 def start_delta_hedger():
     incoming = request.get_json()
-    is_valid = verify_token(incoming["token"])
-
-    if is_valid:
-        user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        delta_hedge_task = start_delta_hedge.delay(float(incoming["interval_min"]),
-                                                   float(incoming["interval_max"]),
-                                                   float(incoming["time_period"]),
-                                                   incoming["currency"],
-                                                   incoming["instrument"],
-                                                   user.api_pubkey,
-                                                   user.api_privkey)
-        task = Task(
-            pid=delta_hedge_task.task_id,
-            timeinterval=float(incoming["time_period"]),
-            delta_min = float(incoming["interval_min"]),
-            delta_max = float(incoming["interval_max"]),
-            instrument = incoming["instrument"],
-            is_running = True
-        )
-        user.tasks.append(task)
-        db.session.add(task)
-        db.session.commit()
-        return jsonify(deltahedger_started=True)
+    user = User.get_user_with_email_and_password(incoming["email"], incoming["password"])
+    if user:
+        tasks = Task.query.filter_by(is_running=1, user_id=user.id).first()
+        print("Tasks", tasks)
+        if not tasks:
+            delta_hedge_task = start_delta_hedge.delay(float(incoming["interval_min"]),
+                                                    float(incoming["interval_max"]),
+                                                    float(incoming["time_period"]),
+                                                    incoming["currency"],
+                                                    incoming["instrument"],
+                                                    user.dencrypt_api_key(incoming["password"], user.api_pubkey),
+                                                    user.dencrypt_api_key(incoming["password"], user.api_privkey))
+            task = Task(
+                pid=delta_hedge_task.task_id,
+                timeinterval=float(incoming["time_period"]),
+                delta_min = float(incoming["interval_min"]),
+                delta_max = float(incoming["interval_max"]),
+                instrument = incoming["instrument"],
+                is_running = True
+            )
+            user.tasks.append(task)
+            db.session.add(task)
+            db.session.commit()
+            return jsonify(deltahedger_started=True)
+        else:
+            return jsonify(deltahedger_started=False,
+            message="Deltahedger is already running"), 403
     else:
-        return jsonify(token_is_valid=False), 403
+        return jsonify(message="Wrong passwor, please try again"), 403
 
 @app.route('/api/get_runnung_tasks', methods=['POST'])
 def get_running_tasks():
@@ -236,29 +241,55 @@ def update_api_keys():
     user = User.get_user_with_email_and_password(incoming["email"], incoming["password"])
     
     if user:
-        user.api_pubkey  = user.encrypt_api_key(incoming["password"], incoming["api_pubkey"]) 
-        user.api_privkey = user.encrypt_api_key(incoming["password"], incoming["api_privkey"]) 
-        db.session.commit()
-        return jsonify(
-            api_keys_updated=True,
-            api_pubkey=user.dencrypt_api_key(incoming["password"], user.api_pubkey),
-            api_privkey=user.dencrypt_api_key(incoming["password"], user.api_privkey)
-            )
+        try:
+            deribitClient = RestClient(incoming["api_pubkey"], incoming["api_privkey"])
+            positions = deribitClient.positions()
+            user.api_pubkey  = user.encrypt_api_key(incoming["password"], incoming["api_pubkey"]) 
+            user.api_privkey = user.encrypt_api_key(incoming["password"], incoming["api_privkey"]) 
+            db.session.commit()
+            return jsonify(
+                api_keys_updated=True,
+                api_pubkey=user.dencrypt_api_key(incoming["password"], user.api_pubkey),
+                api_privkey=user.dencrypt_api_key(incoming["password"], user.api_privkey)
+                )
+        except:
+            return jsonify(message="Deribit keys are wrong"), 500
     else:
-        return jsonify(token_is_valid=False), 403
+        return jsonify(message="Wrong passwor, please try again"), 403
 
 @app.route('/api/get_api_keys', methods=['POST'])
 def get_api_keys():
     incoming = request.get_json()
     user = User.get_user_with_email_and_password(incoming["email"], incoming["password"])
     if user:
-        return jsonify(
-            api_pubkey=user.dencrypt_api_key(incoming["password"], user.api_pubkey),
-            api_privkey=user.dencrypt_api_key(incoming["password"], user.api_privkey)
-        )
+        if user.api_pubkey and user.api_privkey:
+            try:
+                deribitClient = RestClient(user.dencrypt_api_key(incoming["password"], user.api_pubkey), user.dencrypt_api_key(incoming["password"], user.api_privkey))
+                positions = deribitClient.positions()
+                return jsonify(
+                api_pubkey=user.dencrypt_api_key(incoming["password"], user.api_pubkey),
+                api_privkey=user.dencrypt_api_key(incoming["password"], user.api_privkey))
+            except:
+                return jsonify(message="Deribit keys are wrong"), 500
+        else:
+            return jsonify(message="Keys are not set on the server. Please update"), 409
+        
+    else:
+        return jsonify(message="Wrong password, please try again"), 403
+
+@app.route('/api/verify_api_keys', methods=['POST'])
+def verify_api_keys():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+    if is_valid:    
+        try:
+            deribitClient = RestClient(incoming["api_pubkey"], incoming["api_privkey"])
+            positions = deribitClient.positions()
+            return jsonify(keys_valid=True)
+        except:
+            return jsonify(message="Deribit keys are wrong"), 500
     else:
         return jsonify(token_is_valid=False), 403
-
 
 @app.route('/api/compute_pnl', methods=['POST'])
 def compute_pnl():

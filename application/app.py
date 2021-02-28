@@ -140,9 +140,9 @@ def start_delta_hedger():
         tasks = Task.query.filter_by(is_running=1, user_id=user.id).first()
         print("Tasks", tasks)
         if not tasks:
-            delta_hedge_task = start_delta_hedge.delay(float(incoming["interval_min"]),
-                                                    float(incoming["interval_max"]),
+            delta_hedge_task = start_delta_hedge.delay(
                                                     float(incoming["time_period"]),
+                                                    float(incoming["target_delta"]),
                                                     incoming["currency"],
                                                     incoming["instrument"],
                                                     user.dencrypt_api_key(incoming["password"], user.api_pubkey),
@@ -150,8 +150,7 @@ def start_delta_hedger():
             task = Task(
                 pid=delta_hedge_task.task_id,
                 timeinterval=float(incoming["time_period"]),
-                delta_min = float(incoming["interval_min"]),
-                delta_max = float(incoming["interval_max"]),
+                target_delta = float(incoming["target_delta"]),
                 instrument = incoming["instrument"],
                 is_running = True
             )
@@ -177,7 +176,7 @@ def get_running_tasks():
         pid=[]
         timestamp=[]
         timeinterval=[]
-        delta_min=[]
+        target_delta=[]
         delta_max=[]
         instrument=[]
         is_running = []
@@ -186,11 +185,10 @@ def get_running_tasks():
             pid.append(item.pid),
             timestamp.append(item.timestamp.strftime("%Y-%m-%d %H:%M:%S"))
             timeinterval.append(item.timeinterval)
-            delta_min.append(item.delta_min)
-            delta_max.append(item.delta_max)
+            target_delta.append(item.target_delta)
             instrument.append(item.instrument)
             is_running.append(item.is_running)
-        result = [{"id": i, "pid": p, "timestamp": t, "timeinterval": ti, "delta_min":dmin, "delta_max":dmax, "instrument": instr, "is_run": is_run} for i, p, t, ti, dmin, dmax, instr, is_run in zip(id, pid, timestamp, timeinterval, delta_min, delta_max, instrument, is_running)]
+        result = [{"id": i, "pid": p, "timestamp": t, "timeinterval": ti, "target_delta":d, "instrument": instr, "is_run": is_run} for i, p, t, ti, d, instr, is_run in zip(id, pid, timestamp, timeinterval, target_delta, instrument, is_running)]
         return json.dumps(result)
     else:
         return jsonify(token_is_valid=False), 403
@@ -205,13 +203,15 @@ def kill_task():
         try:
             celery_app.control.revoke(pid, terminate=True, signal='SIGKILL')
         except Exception:
+            print("No task")
             return jsonify(task_stopped=False)
 
         user = User.query.filter_by(email=incoming["email"]).first_or_404()
         task = Task.query.filter_by(pid=pid).first_or_404()
         ## check if a task is really revoked
         res = celery_app.AsyncResult(pid)
-        if res.state == 'REVOKED':
+        print("Result task", res)
+        if res.state == 'REVOKED' or not res.state:
             task.is_running = False
             db.session.add(task)
             db.session.commit()

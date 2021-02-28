@@ -3,7 +3,7 @@
 from math import log, sqrt, exp
 import time
 
-def hedgeDelta(deribitClient, index, interval_min, interval_max, currency, instrument):
+def hedgeDelta(deribitClient, index, delta, currency, instrument):
     print("Index values", index)
     # print("Hist vola", hist_vola.iloc[-1])
 
@@ -27,7 +27,7 @@ def hedgeDelta(deribitClient, index, interval_min, interval_max, currency, instr
 
         ## Make delta 0 if its out of range
 
-        while (globalDelta >= interval_max) or (globalDelta <= interval_min):
+        while (round(globalDelta,2) != round(delta,2)):
             ## futures contract
             # fut = currency+"-" + str("27DEC19")
 
@@ -36,7 +36,7 @@ def hedgeDelta(deribitClient, index, interval_min, interval_max, currency, instr
             # print(orderBook)
 
             ## Placing orders
-            if globalDelta > 0: # sell futures on bid
+            if globalDelta > delta: # sel futures on bid
                 bestBidPrice = orderBook["bids"][0]["price"]
                 bestBidAmount = orderBook["bids"][0]["amount"]
                 print("Best bid price", bestBidPrice, "Best bid amount", bestBidAmount)
@@ -53,7 +53,7 @@ def hedgeDelta(deribitClient, index, interval_min, interval_max, currency, instr
                                                time_in_force="fill_or_kill", postOnly=None, label=None)
                     print(trade)
 
-            if globalDelta < 0: # buy futures on ask
+            if globalDelta < delta: # buy futures on ask
                 bestAskPrice = orderBook["asks"][0]["price"]
                 bestAskAmount = orderBook["asks"][0]["amount"]
                 print("Best ask price", bestAskPrice, "Best ask amount", bestAskAmount)

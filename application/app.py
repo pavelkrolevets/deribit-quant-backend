@@ -140,9 +140,8 @@ def start_delta_hedger():
         tasks = Task.query.filter_by(is_running=1, user_id=user.id).first()
         print("Tasks", tasks)
         if not tasks:
-            delta_hedge_task = start_delta_hedge.delay(
+            delta_hedge_task = start_delta_hedge.delay(float(incoming["target_delta"]),
                                                     float(incoming["time_period"]),
-                                                    float(incoming["target_delta"]),
                                                     incoming["currency"],
                                                     incoming["instrument"],
                                                     user.dencrypt_api_key(incoming["password"], user.api_pubkey),
@@ -210,8 +209,8 @@ def kill_task():
         task = Task.query.filter_by(pid=pid).first_or_404()
         ## check if a task is really revoked
         res = celery_app.AsyncResult(pid)
-        print("Result task", res)
-        if res.state == 'REVOKED' or not res.state:
+        print("Result task", res.state)
+        if res.state == 'REVOKED' or res.state == 'PENDING' or not res.state:
             task.is_running = False
             db.session.add(task)
             db.session.commit()

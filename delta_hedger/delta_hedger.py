@@ -14,63 +14,69 @@ def hedgeDelta(deribitClient, index, delta, currency, instrument):
         print("Account equity", account['equity'], "Currency", currency)
     except Exception:
         print("Error getting account...")
-        pass
-
-    # ## check for open positions
-    # positions = deribitClient.positions()
-    # print("Open positions", positions)
 
     ## Get global delta
     try:
         globalDelta = deribitClient.account(currency, True)["deltaTotal"]
-        print("deltaTotal", globalDelta, "Instrument", currency)
-
-        ## Make delta 0 if its out of range
 
         while (round(globalDelta,2) != round(delta,2)):
-            ## futures contract
-            # fut = currency+"-" + str("27DEC19")
-
             ## get futures positions
             orderBook = deribitClient.getorderbook(instrument)
-            # print(orderBook)
 
             ## Placing orders
-            if globalDelta > delta: # sel futures on bid
+            if globalDelta > delta: # sel futures at bid
                 bestBidPrice = orderBook["bids"][0]["price"]
                 bestBidAmount = orderBook["bids"][0]["amount"]
                 print("Best bid price", bestBidPrice, "Best bid amount", bestBidAmount)
-                if bestBidAmount > sqrt(globalDelta**2)*index:
-                    ## place the order
-                    try:
-                        trade = deribitClient.sell(instrument, sqrt(globalDelta**2)*index/10, bestBidPrice, type="limit", time_in_force= "fill_or_kill", postOnly=None, label=None)
-                        print(trade)
-                    except Exception:
-                        print("Error placing the trade.")
-                else:
-                    ## place the order
-                    trade = deribitClient.sell(instrument, bestBidAmount / 10, bestBidPrice, type="limit",
-                                               time_in_force="fill_or_kill", postOnly=None, label=None)
-                    print(trade)
-
+                delta_diff = (globalDelta - delta)/globalDelta
+                print("Sell amount ",delta_diff,delta_diff*index)
+                trade = deribitClient.sell(instrument, delta_diff*index, bestBidPrice, type="limit", time_in_force= "immediate_or_cancel", postOnly=None, label=None)
+                print(trade)
+                # if bestBidAmount >= delta_diff*index:
+                #     ## place the order
+                #     try:
+                #         print("Sell amount ",delta_diff*index)
+                #         trade = deribitClient.sell(instrument, delta_diff*index, bestBidPrice, type="limit", time_in_force= "fill_or_kill", postOnly=None, label=None)
+                #         print(trade)
+                #     except:
+                #         print("Error placing the trade.")
+                # elif bestBidAmount < delta_diff*index:
+                #     ## place the order
+                #     try:
+                #         trade = deribitClient.sell(instrument, bestBidAmount, bestBidPrice, type="limit",
+                #                                 time_in_force="fill_or_kill", postOnly=None, label=None)
+                #         print("Sell amount ", bestBidAmount)
+                #         print(trade)
+                #     except:
+                #         print("Error placing the trade.")
             if globalDelta < delta: # buy futures on ask
                 bestAskPrice = orderBook["asks"][0]["price"]
                 bestAskAmount = orderBook["asks"][0]["amount"]
                 print("Best ask price", bestAskPrice, "Best ask amount", bestAskAmount)
-                if bestAskAmount > sqrt(globalDelta**2)*index:
-                    ## place the order
-                    trade = deribitClient.buy(instrument, sqrt(globalDelta**2)*index/10, bestAskPrice, type="limit", time_in_force= "fill_or_kill", postOnly=None, label=None)
-                    print(trade)
-                else:
-                    ## place the order
-                    trade = deribitClient.buy(instrument, bestAskAmount/10, bestAskPrice, type="limit",
-                                              time_in_force="fill_or_kill", postOnly=None, label=None)
-                    print(trade)
-
+                delta_diff = (delta - globalDelta)/delta
+                print("Buy amount ", delta_diff, delta_diff ,delta_diff*index)
+                trade = deribitClient.buy(instrument, delta_diff*index, bestAskPrice, type="limit", time_in_force= "immediate_or_cancel", postOnly=None, label=None)
+                print(trade)
+                # if bestAskAmount >= delta_diff*index:
+                #      ## place the order
+                #     try:
+                #         print("Buy amount ", delta_diff ,delta_diff*index)
+                #         trade = deribitClient.buy(instrument, delta_diff*index, bestAskPrice, type="limit", time_in_force= "fill_or_kill", postOnly=None, label=None)
+                #         print(trade)
+                #     except:
+                #         print("Error placing the trade.")
+                # elif bestAskAmount < delta_diff*index:
+                #     ## place the order
+                #     try:
+                #         trade = deribitClient.buy(instrument, bestAskAmount, bestAskPrice, type="limit",
+                #                                 time_in_force="fill_or_kill", postOnly=None, label=None)
+                #         print("Buy amount ", bestAskAmount)
+                #         print(trade)
+                #     except:
+                #         print("Error placing the trade.")
             globalDelta = deribitClient.account(currency, True)["deltaTotal"]
-            print("deltaTotal", globalDelta, "Currency", currency)
-            time.sleep(5)
+            print("deltaTotal", globalDelta, "Instrument", instrument, "Target Delta", delta)
+            time.sleep(0.1)
 
     except Exception:
-        print("Error connecting to API.")
-        pass
+        print("Error placing orders.")

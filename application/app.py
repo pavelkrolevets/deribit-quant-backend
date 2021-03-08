@@ -1,5 +1,5 @@
 from flask import request, jsonify, g
-from .models import User, Task
+from .models import User, Task, BtcFutures, EthFutures
 from index import app, db
 from sqlalchemy.exc import IntegrityError
 from .utils.auth import generate_token, requires_auth, verify_token
@@ -10,6 +10,7 @@ from celery.result import AsyncResult
 from delta_hedger.celery_app import celery_app
 from finance.pnl import *
 from finance.vola import *
+from delta_hedger.utils.deribit_api import RestClient
 
 celery_app.conf.broker_url = 'redis://localhost:6379/0'
 
@@ -50,7 +51,7 @@ def get_token():
     if user:
         return jsonify(token=generate_token(user))
 
-    return jsonify(error=True), 403
+    return jsonify(error=True, message = "Wrong username, or password"), 403
 
 
 @app.route("/api/is_token_valid", methods=["POST"])
@@ -134,57 +135,86 @@ def compute_bsm():
 @app.route('/api/start_delta_hedger', methods=['POST'])
 def start_delta_hedger():
     incoming = request.get_json()
-    is_valid = verify_token(incoming["token"])
-
-    if is_valid:
-        user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        delta_hedge_task = start_delta_hedge.delay(float(incoming["interval_min"]),
-                                                   float(incoming["interval_max"]),
-                                                   float(incoming["time_period"]),
-                                                   incoming["instrument"],
-                                                   user.api_pubkey,
-                                                   user.api_privkey)
-        task = Task(
-            pid=delta_hedge_task.task_id,
-            timeinterval=float(incoming["time_period"]),
-            delta_min = float(incoming["interval_min"]),
-            delta_max = float(incoming["interval_max"]),
-            instrument = incoming["instrument"]
-        )
-        user.tasks.append(task)
-        db.session.add(task)
-        db.session.commit()
-        return jsonify(deltahedger_started=True)
+    user = User.get_user_with_email_and_password(incoming["email"], incoming["password"])
+    if user:
+        running_task = Task.query.filter_by(is_running=True, user_id=user.id, curency=incoming["currency"]).first()
+        print("Tasks", running_task)
+        if not running_task:
+            delta_hedge_task = start_delta_hedge.delay(float(incoming["target_delta"]),
+                                                    float(incoming["time_period"]),
+                                                    incoming["currency"],
+                                                    incoming["instrument"],
+                                                    user.dencrypt_api_key(incoming["password"], user.api_pubkey),
+                                                    user.dencrypt_api_key(incoming["password"], user.api_privkey))
+            task = Task(
+                pid=delta_hedge_task.task_id,
+                timeinterval=float(incoming["time_period"]),
+                target_delta = float(incoming["target_delta"]),
+                instrument = incoming["instrument"],
+                is_running = True,
+                curency = incoming["currency"]
+            )
+            user.tasks.append(task)
+            db.session.add(task)
+            db.session.commit()
+            return jsonify(deltahedger_started=True)
+        else:
+            return jsonify(deltahedger_started=False,
+            message="Deltahedger is already running for selected currency"), 403
     else:
-        return jsonify(token_is_valid=False), 403
+        return jsonify(message="Wrong password, please try again"), 403
 
-@app.route('/api/get_tasks', methods=['POST'])
-def get_tasks():
+@app.route('/api/get_runnung_tasks', methods=['POST'])
+def get_running_tasks():
     incoming = request.get_json()
     is_valid = verify_token(incoming["token"])
 
     if is_valid:
         user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        tasks = user.tasks
+        tasks = Task.query.filter_by(is_running=incoming["is_running"], user_id=user.id)
         id=[]
         pid=[]
         timestamp=[]
         timeinterval=[]
-        delta_min=[]
+        target_delta=[]
         delta_max=[]
         instrument=[]
+        is_running = []
         for item in tasks:
             id.append(item.id),
             pid.append(item.pid),
             timestamp.append(item.timestamp.strftime("%Y-%m-%d %H:%M:%S"))
             timeinterval.append(item.timeinterval)
-            delta_min.append(item.delta_min)
-            delta_max.append(item.delta_max)
+            target_delta.append(item.target_delta)
             instrument.append(item.instrument)
-        result = [{"id": i, "pid": p, "timestamp": t, "timeinterval": ti, "delta_min":dmin, "delta_max":dmax, "instrument": instr} for i, p, t, ti, dmin, dmax, instr in zip(id, pid, timestamp, timeinterval, delta_min, delta_max, instrument)]
+            is_running.append(item.is_running)
+        result = [{"id": i, "pid": p, "timestamp": t, "timeinterval": ti, "target_delta":d, "instrument": instr, "is_run": is_run} for i, p, t, ti, d, instr, is_run in zip(id, pid, timestamp, timeinterval, target_delta, instrument, is_running)]
         return json.dumps(result)
     else:
         return jsonify(token_is_valid=False), 403
+
+@app.route('/api/get_worker_state', methods=['POST'])
+def get_worker_state():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        i = celery_app.control.inspect()
+        availability = i.ping()
+        stats = i.stats()
+        registered_tasks = i.registered()
+        active_tasks = i.active()
+        scheduled_tasks = i.scheduled()
+        result = {
+            'availability': availability,
+            'stats': stats,
+            'registered_tasks': registered_tasks,
+            'active_tasks': active_tasks,
+            'scheduled_tasks': scheduled_tasks
+        }
+        return json.dumps(result)
+    else:
+        return jsonify(token_is_valid=False, message="Deribit keys are wrong"), 403
 
 @app.route('/api/kill_task', methods=['POST'])
 def kill_task():
@@ -193,25 +223,27 @@ def kill_task():
 
     if is_valid:
         pid = incoming["pid"]
-        res = AsyncResult(pid, app=celery_app)
-        print(res.state)
-
         try:
-            celery_app.control.revoke(pid, terminate=True, signal='SIGKILL')
+            celery_task = celery_app.AsyncResult(pid)
+            if celery_task.state == 'STARTED':
+                celery_app.control.revoke(pid, terminate=True, signal='SIGKILL')
+            user = User.query.filter_by(email=incoming["email"]).first_or_404()
+            task = Task.query.filter_by(pid=pid).first_or_404()
+            ## check if a task is really revoked
+            res = celery_app.AsyncResult(pid)
+            print("Result task", res.state)
+            if res.state == 'REVOKED' or res.state == 'FAILURE':
+                task.is_running = False
+                db.session.add(task)
+                db.session.commit()
+                return jsonify(task_stopped=True)
+            else:
+                return jsonify(task_stopped=False)
         except Exception:
+            print("Error getting celery task")
             return jsonify(task_stopped=False)
-
-        res = celery_app.AsyncResult(pid)
-        print(res.state)
-
-        user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        task = Task.query.filter_by(pid=pid).first_or_404()
-        user.tasks.remove(task)
-        db.session.commit()
-
-        return jsonify(task_stopped=True)
     else:
-        return jsonify(token_is_valid=False), 403
+        return jsonify(token_is_valid=False, message="Wrong token, please login again"), 403
 
 @app.route('/api/get_task_state', methods=['POST'])
 def get_task_state():
@@ -230,31 +262,58 @@ def get_task_state():
 @app.route('/api/update_api_keys', methods=['POST'])
 def update_api_keys():
     incoming = request.get_json()
-    is_valid = verify_token(incoming["token"])
-
-    if is_valid:
-        user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        user.api_pubkey = incoming["api_pubkey"]
-        user.api_privkey = incoming["api_privkey"]
-        db.session.commit()
-        return jsonify(api_keys_updated=True)
+    user = User.get_user_with_email_and_password(incoming["email"], incoming["password"])
+    
+    if user:
+        try:
+            deribitClient = RestClient(incoming["api_pubkey"], incoming["api_privkey"])
+            positions = deribitClient.positions()
+            user.api_pubkey  = user.encrypt_api_key(incoming["password"], incoming["api_pubkey"]) 
+            user.api_privkey = user.encrypt_api_key(incoming["password"], incoming["api_privkey"]) 
+            db.session.commit()
+            return jsonify(
+                api_keys_updated=True,
+                api_pubkey=user.dencrypt_api_key(incoming["password"], user.api_pubkey),
+                api_privkey=user.dencrypt_api_key(incoming["password"], user.api_privkey)
+                )
+        except:
+            return jsonify(message="Deribit keys are wrong. Please update"), 500
     else:
-        return jsonify(token_is_valid=False), 403
+        return jsonify(message="Wrong password, please try again"), 403
 
 @app.route('/api/get_api_keys', methods=['POST'])
 def get_api_keys():
     incoming = request.get_json()
-    is_valid = verify_token(incoming["token"])
-
-    if is_valid:
-        user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        return jsonify(
-            api_pubkey=user.api_pubkey,
-            api_privkey=user.api_privkey
-        )
+    user = User.get_user_with_email_and_password(incoming["email"], incoming["password"])
+    if user:
+        if user.api_pubkey and user.api_privkey:
+            try:
+                deribitClient = RestClient(user.dencrypt_api_key(incoming["password"], user.api_pubkey), user.dencrypt_api_key(incoming["password"], user.api_privkey))
+                positions = deribitClient.positions()
+                return jsonify(
+                api_pubkey=user.dencrypt_api_key(incoming["password"], user.api_pubkey),
+                api_privkey=user.dencrypt_api_key(incoming["password"], user.api_privkey))
+            except:
+                return jsonify(message="Deribit keys are wrong. Please update"), 500
+        else:
+            return jsonify(message="Keys are not set on the server. Please update"), 409
+        
     else:
-        return jsonify(token_is_valid=False), 403
+        return jsonify(message="Wrong password, please try again"), 403
 
+@app.route('/api/verify_api_keys', methods=['POST'])
+def verify_api_keys():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+    if is_valid:    
+        try:
+            deribitClient = RestClient(incoming["api_pubkey"], incoming["api_privkey"])
+            positions = deribitClient.positions()
+            return jsonify(keys_valid=True)
+        except:
+            return jsonify(message="Deribit keys are wrong"), 500
+    else:
+        return jsonify(token_is_valid=False, message="Wrong token, please try again"), 403
 
 @app.route('/api/compute_pnl', methods=['POST'])
 def compute_pnl():
@@ -302,5 +361,28 @@ def analaize_positions():
                                              float(incoming["vola"]))
         return jsonify(pnl=pnl,
                        pnl_at_exp=pnl_at_exp)
+    else:
+        return jsonify(token_is_valid=False), 403
+
+
+@app.route('/api/get_btc_contango', methods=['POST'])
+def get_btc_returns():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        data = BtcFutures.query.filter(BtcFutures.timestamp).all()
+        return jsonify(json_list=[i.serialize for i in data[-1000:]])
+    else:
+        return jsonify(token_is_valid=False), 403
+
+@app.route('/api/get_eth_contango', methods=['POST'])
+def get_eth_returns():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        data = EthFutures.query.filter(EthFutures.timestamp).all()
+        return jsonify(json_list=[i.serialize for i in data[-1000:]])
     else:
         return jsonify(token_is_valid=False), 403

@@ -16,6 +16,10 @@ Boilerplate application for a Flask JWT Backend and a React/Redux Front-End with
 
 ![screenshot](http://i.imgur.com/ZIS4qkw.png)
 
+### UBUNTU Install prerequisites
+```bash
+sudo apt-get install build-essential libssl-dev libffi-dev python-dev
+```
 ### Create DB
 ```sh
 $ export DATABASE_URL="postgresql://username:password@localhost/mydatabase"

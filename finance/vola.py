@@ -3,8 +3,8 @@ from delta_hedger.gateio import getVola
 import gate_api
 from delta_hedger.utils.deribit_api import RestClient
 import time
-
-
+from datetime import datetime
+import json
 
 def getHistVola(window, timeframe, instrument):
     # GATEIO API v.4
@@ -17,9 +17,14 @@ def getHistVola(window, timeframe, instrument):
     api_spot = gate_api.SpotApi(gate_api.ApiClient(configuration))
 
     histVola = getVola(api_spot, 600, timeframe, (instrument+"_USDT"), window, False)
+    print(histVola)
     hist_vola_graph = []
     for i in range(24*7, len(histVola)):
-        hist_vola_graph.append({'x': i, 'y': histVola.iloc[i]})
+        hist_vola_graph.append({'x': histVola["Time"].iloc[i], 'y': histVola["vola"].iloc[i]})
+
+    # for index, row in histVola.iterrows():
+    #     #     # print(row.name)
+    #     hist_vola_graph.append({'x': int(row["Time"]), 'y': float(row["vola"])})
     return hist_vola_graph
 
 

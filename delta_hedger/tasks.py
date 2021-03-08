@@ -10,7 +10,7 @@ import time
 
 logger = get_task_logger(__name__)
 
-@celery_app.task(name='deltahedge.processing')
+@celery_app.task(name='deltahedge.processing', max_retries=5)
 def start_delta_hedge(delta, time_period, currency, instrument, deribit_key, deribit_secret):
     try:
         '''Deribit Part'''

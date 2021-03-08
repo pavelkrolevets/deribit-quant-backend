@@ -6,10 +6,14 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 import os
+from sqlalchemy.dialects.postgresql import UUID
+from flask_sqlalchemy import SQLAlchemy
+import uuid
 
 class User(db.Model):
-    __tablename__ = 'user'
+    __tablename__ = 'users'
     id = db.Column(db.Integer(), primary_key=True)
+    uuid = db.Column(UUID(as_uuid=True), default=uuid.uuid4)
     email = db.Column(db.String(255), unique=True)
     password = db.Column(db.String(255))
     eth_account = db.Column(db.String(255))
@@ -74,6 +78,7 @@ class User(db.Model):
 class Task(db.Model):
     __tablename__ = 'task'
     id = db.Column(db.Integer, primary_key=True)
+    uuid = db.Column(UUID(as_uuid=True), default=uuid.uuid4)
     pid = db.Column(db.String(255))
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     timeinterval = db.Column(db.Integer)
@@ -82,7 +87,8 @@ class Task(db.Model):
     target_delta = db.Column(db.Float)
     instrument = db.Column(db.String(255))
     is_running = db.Column(db.Boolean)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    curency = db.Column(db.String(255))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     user = db.relationship("User", back_populates="tasks")
 
 

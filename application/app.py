@@ -51,7 +51,7 @@ def get_token():
     if user:
         return jsonify(token=generate_token(user))
 
-    return jsonify(error=True), 403
+    return jsonify(error=True, message = "Wrong username, or password"), 403
 
 
 @app.route("/api/is_token_valid", methods=["POST"])
@@ -137,9 +137,9 @@ def start_delta_hedger():
     incoming = request.get_json()
     user = User.get_user_with_email_and_password(incoming["email"], incoming["password"])
     if user:
-        tasks = Task.query.filter_by(is_running=1, user_id=user.id).first()
-        print("Tasks", tasks)
-        if not tasks:
+        running_task = Task.query.filter_by(is_running=True, user_id=user.id, curency=incoming["currency"]).first()
+        print("Tasks", running_task)
+        if not running_task:
             delta_hedge_task = start_delta_hedge.delay(float(incoming["target_delta"]),
                                                     float(incoming["time_period"]),
                                                     incoming["currency"],
@@ -151,7 +151,8 @@ def start_delta_hedger():
                 timeinterval=float(incoming["time_period"]),
                 target_delta = float(incoming["target_delta"]),
                 instrument = incoming["instrument"],
-                is_running = True
+                is_running = True,
+                curency = incoming["currency"]
             )
             user.tasks.append(task)
             db.session.add(task)
@@ -159,9 +160,9 @@ def start_delta_hedger():
             return jsonify(deltahedger_started=True)
         else:
             return jsonify(deltahedger_started=False,
-            message="Deltahedger is already running"), 403
+            message="Deltahedger is already running for selected currency"), 403
     else:
-        return jsonify(message="Wrong passwor, please try again"), 403
+        return jsonify(message="Wrong password, please try again"), 403
 
 @app.route('/api/get_runnung_tasks', methods=['POST'])
 def get_running_tasks():
@@ -192,6 +193,29 @@ def get_running_tasks():
     else:
         return jsonify(token_is_valid=False), 403
 
+@app.route('/api/get_worker_state', methods=['POST'])
+def get_worker_state():
+    incoming = request.get_json()
+    is_valid = verify_token(incoming["token"])
+
+    if is_valid:
+        i = celery_app.control.inspect()
+        availability = i.ping()
+        stats = i.stats()
+        registered_tasks = i.registered()
+        active_tasks = i.active()
+        scheduled_tasks = i.scheduled()
+        result = {
+            'availability': availability,
+            'stats': stats,
+            'registered_tasks': registered_tasks,
+            'active_tasks': active_tasks,
+            'scheduled_tasks': scheduled_tasks
+        }
+        return json.dumps(result)
+    else:
+        return jsonify(token_is_valid=False, message="Deribit keys are wrong"), 403
+
 @app.route('/api/kill_task', methods=['POST'])
 def kill_task():
     incoming = request.get_json()
@@ -200,25 +224,26 @@ def kill_task():
     if is_valid:
         pid = incoming["pid"]
         try:
-            celery_app.control.revoke(pid, terminate=True, signal='SIGKILL')
+            celery_task = celery_app.AsyncResult(pid)
+            if celery_task.state == 'STARTED':
+                celery_app.control.revoke(pid, terminate=True, signal='SIGKILL')
+            user = User.query.filter_by(email=incoming["email"]).first_or_404()
+            task = Task.query.filter_by(pid=pid).first_or_404()
+            ## check if a task is really revoked
+            res = celery_app.AsyncResult(pid)
+            print("Result task", res.state)
+            if res.state == 'REVOKED' or res.state == 'FAILURE':
+                task.is_running = False
+                db.session.add(task)
+                db.session.commit()
+                return jsonify(task_stopped=True)
+            else:
+                return jsonify(task_stopped=False)
         except Exception:
-            print("No task")
-            return jsonify(task_stopped=False)
-
-        user = User.query.filter_by(email=incoming["email"]).first_or_404()
-        task = Task.query.filter_by(pid=pid).first_or_404()
-        ## check if a task is really revoked
-        res = celery_app.AsyncResult(pid)
-        print("Result task", res.state)
-        if res.state == 'REVOKED' or res.state == 'PENDING' or not res.state:
-            task.is_running = False
-            db.session.add(task)
-            db.session.commit()
-            return jsonify(task_stopped=True)
-        else:
+            print("Error getting celery task")
             return jsonify(task_stopped=False)
     else:
-        return jsonify(token_is_valid=False), 403
+        return jsonify(token_is_valid=False, message="Wrong token, please login again"), 403
 
 @app.route('/api/get_task_state', methods=['POST'])
 def get_task_state():
@@ -252,9 +277,9 @@ def update_api_keys():
                 api_privkey=user.dencrypt_api_key(incoming["password"], user.api_privkey)
                 )
         except:
-            return jsonify(message="Deribit keys are wrong"), 500
+            return jsonify(message="Deribit keys are wrong. Please update"), 500
     else:
-        return jsonify(message="Wrong passwor, please try again"), 403
+        return jsonify(message="Wrong password, please try again"), 403
 
 @app.route('/api/get_api_keys', methods=['POST'])
 def get_api_keys():
@@ -269,7 +294,7 @@ def get_api_keys():
                 api_pubkey=user.dencrypt_api_key(incoming["password"], user.api_pubkey),
                 api_privkey=user.dencrypt_api_key(incoming["password"], user.api_privkey))
             except:
-                return jsonify(message="Deribit keys are wrong"), 500
+                return jsonify(message="Deribit keys are wrong. Please update"), 500
         else:
             return jsonify(message="Keys are not set on the server. Please update"), 409
         
@@ -288,7 +313,7 @@ def verify_api_keys():
         except:
             return jsonify(message="Deribit keys are wrong"), 500
     else:
-        return jsonify(token_is_valid=False), 403
+        return jsonify(token_is_valid=False, message="Wrong token, please try again"), 403
 
 @app.route('/api/compute_pnl', methods=['POST'])
 def compute_pnl():

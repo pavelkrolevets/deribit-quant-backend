@@ -181,6 +181,14 @@ def get_running_tasks():
         instrument=[]
         is_running = []
         for item in tasks:
+            if item.is_running:
+                ## check if running
+                res = celery_app.AsyncResult(item.pid)
+                if not res.state == 'STARTED': 
+                    task.is_running = False
+                    db.session.add(task)
+                    db.session.commit()
+                    item.is_running = False
             id.append(item.id),
             pid.append(item.pid),
             timestamp.append(item.timestamp.strftime("%Y-%m-%d %H:%M:%S"))
@@ -232,7 +240,7 @@ def kill_task():
             ## check if a task is really revoked
             res = celery_app.AsyncResult(pid)
             print("Result task", res.state)
-            if res.state == 'REVOKED' or res.state == 'FAILURE':
+            if res.state == 'REVOKED' or res.state == 'FAILURE' or res.state == 'PENDING':
                 task.is_running = False
                 db.session.add(task)
                 db.session.commit()
@@ -253,7 +261,7 @@ def get_task_state():
     if is_valid:
         pid = incoming["pid"]
         res = celery_app.AsyncResult(pid)
-        print(res.state)
+        print(res.state, pid)
 
         return jsonify(task_state=res.state)
     else:

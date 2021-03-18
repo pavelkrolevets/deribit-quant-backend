@@ -7,14 +7,6 @@ def hedgeDelta(deribitClient, index, delta, currency, instrument):
     print("Index values", index)
     # print("Hist vola", hist_vola.iloc[-1])
 
-    ## Get account equity
-
-    try:
-        account = deribitClient.account(currency, True)
-        print("Account equity", account['equity'], "Currency", currency)
-    except Exception:
-        print("Error getting account...")
-
     ## Get global delta
     try:
         globalDelta = deribitClient.account(currency, True)["deltaTotal"]
@@ -48,3 +40,5 @@ def hedgeDelta(deribitClient, index, delta, currency, instrument):
 
     except Exception:
         print("Error starting hedger.")
+        traceback.print_exc(file=sys.stdout)
+        sys.exit(0)

@@ -186,9 +186,8 @@ def get_running_tasks():
                 res = celery_app.AsyncResult(item.pid)
                 if not res.state == 'STARTED': 
                     task.is_running = False
-                    db.session.add(task)
+                    db.session.add(item)
                     db.session.commit()
-                    item.is_running = False
             id.append(item.id),
             pid.append(item.pid),
             timestamp.append(item.timestamp.strftime("%Y-%m-%d %H:%M:%S"))
